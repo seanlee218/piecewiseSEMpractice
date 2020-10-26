@@ -1,0 +1,106 @@
+---
+title: "Piecewise SEM Progress"
+author: "Sean Lee"
+date: "10/25/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Week 1
+
+  I realized in trying to recreate Bowen et al. 2017 that I needed to actually understand what the code was actually doing.  As I was working through recreating Bowen et al. 2017's SEM model I was clueless on what each line of code was actually doing and how each component of the code ultimately fed into the final SEM model.
+  When I was reseaching how to rewrite the code from Bowen et al. 2017 to work with the current version of piecewiseSEM I was brought to the github page created by the person who wrote The piecewiseSEM package, Jonathan S. Lefcheck.  
+
+(http://jslefche.github.io/piecewiseSEM/articles/piecewiseSEM.html)
+
+  I opened up the site and started reading the intro into SEM.  The basic concept was pretty simple in that it was a model used to establish relationships between multiple variables, through the creation of these casual networks one can establish strength and direction of direct and indirect effects of these variables.
+  Whie delving headfirst into creating an SEM would have been fun, I thought I'd need some further background on how SEM's worked.  I found these videos on Youtube created by Dr. Erin M. Buchanan at Missouri State University.
+  
+Pt. 1
+https://www.youtube.com/watch?v=2LzZvi43pGE&list=RDCMUCMdihazndR0f9XBoSXWqnYg&start_radio=1&t=87
+
+Some basics that were mentioned in the lesson 
+•	Can test multiple regressions at the same time, multiple x and y variables
+•	Can test theorized causal relationships even if the researcher doesn’t initially measure the variables in a causal way
+•	Error can be attributed to different parts of model rather than lumping error term together with multiple variables
+Concept
+	
+Latent variables
+•	Abstract phenomena you are trying to model in SEM (latent variables)
+o	i.e. IQ, many things you can do to measure IQ but not tangible metric
+•	this latent variable is linked to multiple measured variables i.e. test scores
+•	it is represented indirectly by these collective variables
+	
+manifest or observed variables
+•	measured variables, what you are actually measuring (i.e. test scores)
+•	exogenous variables are variables that causal, or your independent variables
+o	arrows will be going out of these variables
+•	exogenous variables will not have error terms as change in these variables are represented by things you are not measuring in model (i.e. age, gender, etc.)
+•	all endogenous variables have to have an error term because x(exogenous) causes y(endogenous)
+o	x to predict y so there is some uncertainty about y since not getting 100% correct 
+•	endogenous terms are dependent variables and arrows always leading into them
+Measurement model
+•	relationship between an exogenous latent variable and measured variables
+•	have this latent variable think affects change ob these endogenous variables
+•	i.e. we think IQ affects the SAT scores
+•	these endogenous variables show what the latent variable is
+•	modelling phenomena with the output of the endogenous variables
+Full SEM
+•	latent variable that explains latent variable that explains endogenous variable
+•	variables can thus be endogenous and exogenous
+•	In measurement model the 2nd circle is exogenous but in full SEM it is endogenous
+•	nonRecursive model model variables can feedback on itself while the recursive the model flows in one way
+
+hypothesis testing
+•	theory building technique
+•	building model to create working theory
+ 
+•	you want data to match model
+•	you want your model to be the null model
+•	model things that exist rather than find significant differences to a null
+•	models should explain phenomena regardless of what dataset used as the null is the norm in the world
+•	 how well does our model explain the phenomena?
+•	Model fit based on residuals, residuals being the error for latent variables
+•	Y(persons score=data)=model(x variables)+error(residuals)
+•	Since residuals are error estimated based on model it is latent (circle)
+•	Low error implies data = model is more accurately modeling the phenomena you are trying to represent
+•	  
+•	Double error represents correlation as not sure which direction relationship is flowing
+
+Path diagrams
+ 
+•	X predicts y direct effect
+•	X predicts z predicts y indirect effects
+•	Usually would have to run 3 regressions but in SEM all in one model
+
+Whole picture
+•	 
+•	Measurement model portion has one latent exogenous variable predicting the square endogenous variables and each endogenous variable gets own error term associated with it
+•	Structural model has another latent exogenous variable predicting this measurement models exogenous variable that is now endogenous
+•	In testing model you have to see adequacy o the model, does the x2 fit the indices?
+•	In terms of theory testing does the model reflect what you hypothesized?
+
+1. An Introduction to Structural Equation Modeling from Jonathan S. Lefcheck
+
+  Equiped with some basic knowledge on how SEM's worked I began to work my way through the github page for piecewise SEM which is linked above.  In the example we are creating a very simple SEM using 4 variables variable x1 is exogenous to variable y1 and y2, y2 is also exogenous to y1 which is in turn exogenous to y3.
+  Traditionally SEM is hard to use to analyze ecological data as the assumptions assume that data is independent and that errors are normally distributed is often not met.  
+  Piecewise SEM was created and differs from traditional SEM in that each relationship between variables is estimated independently. Each local response is decomposed into individual linear or multiple regressions are used to  
+
+
+
+
+```{r}
+
+library(piecewiseSEM)
+```
+ 
+```{r}
+dat <- data.frame(x1 = runif(50), y1 = runif(50), y2 = runif(50), y3 = runif(50))
+
+model <- psem(lm(y1 ~ x1, dat), lm(y1 ~ y2, dat), lm(y2 ~ x1, dat), lm(y3 ~ y1, dat))
+```
+ 
+ 
