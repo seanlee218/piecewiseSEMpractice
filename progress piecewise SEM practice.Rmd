@@ -97,6 +97,108 @@ Whole picture
 library(piecewiseSEM)
 ```
  
+the tutorial uses this sample dataset to fit a model using piecewiseSEM.
+```{r}
+dat <- data.frame(x1 = runif(50), y1 = runif(50), y2 = runif(50), y3 = runif(50))
+dat
+```
+using the "psem" function which is part of piecewiseSEM we create a series of linear regressions between the different factors.
 
+running this code however:
+
+model <- psem(lm(y1 ~ x1, dat), lm(y1 ~ y2, dat), lm(y2 ~ x1, dat), lm(y3 ~ y1, dat))
+
+gives the error:
+
+Error: Duplicate responses detected in the model list. Collapse into single multiple regression!
+
+this is to say that the code displayed above runs all the individual component regressions which lists each "path" seperately.  psem collapses these regressions into a single multiple regression in the following format
+
+```{r}
+model <- psem(lm(y1 ~ x1 + y2, dat), lm(y2 ~ x1, dat), lm(y3 ~ y1, dat))
+model
+```
+ to evaluate the model we call a summary of the psem object we created "model".
+```{r}
+summary(model, .progressBar = F)
+```
+# Standardization of coefficients
+
+To compare the relative strength of the different predictors used in the model you must standardize them.  Allows for effects to be compared across multiple responses and allows for indirect and total responses to be calculated using the multiple responses.  piecewiseSEM has multiple techniques and ways to standardize coefficients and I decided the run through them all.
+
+First the practice asked me to create another fake dataset "coefs.data"
+
+```{r}
+coefs.data <- data.frame(
+  y = runif(100),
+  x1 = runif(100),
+  x2 = runif(100)
+)
+
+model<-lm(y~x1,coefs.data)
+model
+```
+
+
+# No standard
  
+ In some circumstances when all responses are already scaled to the same standard or in some cases you don't want your response variables to be standardized you can specify no standardization
+```{r}
+coefs(model, standardize = "none")
+
+summary(model)$coefficients
+
+## to return intercept
+
+coefs(model, standardize = "none", intercepts = TRUE)
+```
  
+# standardization by standard deviation
+
+One of the most common ways of standardization is to making the coefficients in terms of standard deviation of the mean; this is done by scaling the coefficient beta by the standard dev of x/y.
+
+```{r}
+# Obtain the raw coefficient from the coefficient table
+B <- summary(model)$coefficients[2, 1]
+
+# Compute the standard deviation of the independent variable
+sd.x <- sd(coefs.data$x1)
+
+# Compute the standard deviation of the dependent variable
+sd.y <- sd(coefs.data$y)
+
+# Scale Beta
+B.sdscaled <- B * sd.x/sd.y
+```
+
+now that we got the scaled beta by hand we can compare it to the "scale" standardization option in the "coefs" function. This "scale" option standardizes by st. dev.
+
+```{r}
+coefs(model, standardize = "scale")
+
+B.sdscaled
+```
+Amazing! it's a match.
+
+# Scaling by relevant ranges
+
+default scaling assumes you use the whole range of the dataset, but sometimes the best way to scale the data is to standardize across a relevant range
+
+# range standardizatin by hand
+```{r}
+# Calculate range for the independent variable
+range.x <- diff(range(coefs.data$x1))
+
+# Calculate range for the independent variable
+range.y <- diff(range(coefs.data$y))
+
+# Scale Beta
+B.range <- B * range.x/range.y
+```
+
+In "coefs" function the "range" option for the "standardize" argument standardizes the coefficients based on range difference between the variables.
+```{r}
+coefs(model, standardize = "range")
+B.range
+```
+ They're the same! Amazing!
