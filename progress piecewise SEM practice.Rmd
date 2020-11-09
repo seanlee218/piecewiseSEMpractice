@@ -1,7 +1,7 @@
 ---
 title: "Piecewise SEM Progress"
 author: "Sean Lee"
-date: "10/25/2020"
+date: "11/01/2020"
 output: html_document
 ---
 
@@ -202,3 +202,172 @@ coefs(model, standardize = "range")
 B.range
 ```
  They're the same! Amazing!
+ 
+## GLM in pSEM
+
+SEM shown in the example is one where x1 affects both y1 and y2 which both influence y3.  This SEM has two independence claims:
+
+1.y3 | x1 (y1, y2)
+
+2. y2 | y1 (x1)
+
+Assuming we live in a gaussian world, the second independence claim should have significance values that are equal whether the test is conducted as y2 | y1 (x1) or y1 | y2 (x1).
+
+If however we use GLM's with non-normally distributed data to generate either of the variables this would not be true.  By transforming the data the regression of y2 against y1 is going to be different than y1 regressed against y2.
+
+The example data we generate is using a poisson distribution rather than normal to demonstrate the above statement.
+
+```{r}
+# Generate fake data
+glmdat <- data.frame(x1 = runif(50), y1 = rpois(50, 10), y2 = rpois(50, 50), y3 = runif(50))
+
+# Extract P-values
+summary(lm(y1 ~ y2 + x1, glmdat))$coefficients[2, 4]
+```
+
+```{r}
+summary(lm(y2 ~ y1 + x1, glmdat))$coefficients[2, 4]
+```
+
+If you are using normally distributed data then the y1 against y2 regression same as y2 against y1, amazing!
+
+Let's try it using a poisson distribution.
+
+```{r}
+# Repeat but model y1 and y2 and Poisson-distributed
+summary(glm(y1 ~ y2 + x1, "poisson", glmdat))$coefficients[2, 4]
+```
+
+```{r}
+summary(glm(y2 ~ y1 + x1, "poisson", glmdat))$coefficients[2, 4]
+```
+
+when the variables y1 and y2 are poisson distributed the regression of y1 against y2 and y2 against y1 yield different significance values!
+
+this can be problematic when performing d-seperation tests which test independence of variables not connected by an arrow while controlling variables on which these paths are conditional.  If the p-values are biased on one path vs. another then this can hinder the d-seperation test and also the goodness of fit test which can be over or underestimated based on this bias.
+
+pSEM can solve this issue by:
+
+1. prescribing the directionality of the tests, so you can specify y2 against y1 rather than y1 against y2
+
+2.  One can remove one of the paths and designate it as a correlated error by using %~~%
+
+3.  One can conduct both tests and choose the most conservative which is the one with the lowest P-value.
+
+Let's make some fake data to demonstrate this...
+
+```{r}
+# Generate fake data
+glmdat <- data.frame(x1 = runif(50), y1 = rpois(50, 10), y2 = rpois(50, 50), y3 = runif(50))
+
+# Construct SEM
+glmsem <- psem(
+  glm(y1 ~ x1, "poisson", glmdat),
+  glm(y2 ~ x1, "poisson", glmdat),
+  lm(y3 ~ y1 + y2, glmdat)
+)
+
+#summary(glmsem)
+
+#Error: Non-linearities detected in the basis set where P-values are not symmetrical. This can bias the outcome of the tests of directed separation. Offending independence claims: y2 <- y1 *OR* y2 -> y1 
+#Option 1: Specify directionality using argument 'direction = c()' in 'summary'. 
+
+#Option 2: Remove path from the basis set by specifying as a correlated error using '%~~%' in 'psem'. 
+
+#Option 3 (recommended): Use argument 'conserve = TRUE' in 'summary' to compute both tests, and return the most conservative P-value.
+```
+
+#Option 1: Specify directionality using argument 'direction = c()' in 'summary'. 
+
+In option 1 they ask to specify the directionality of the argument using the direction = c() function in the summary function
+
+```{r}
+summary(glmsem, direction = c("y1 <- y2"), .progressBar = F)$dTable
+
+```
+#Option 2: Remove path from the basis set by specifying as a correlated error using '%~~%' in 'psem'. 
+
+In option 2 we can remove one of the paths altogether, I guess just another way of specifying the path.
+
+```{r}
+summary(update(glmsem, y1 %~~% y2), .progressBar = F)
+```
+Note that the claim no longer appears in the section for the tests of directed separation.
+
+#Option 3 (recommended): Use argument 'conserve = TRUE' in 'summary' to compute both tests, and return the most conservative P-value.
+
+we use the conserve = TRUE argument to pick the path that is most conservative "lowest p-value"
+
+```{r}
+summary(glmsem, conserve = T, .progressBar = F)$dTable
+```
+this seems to be y2~y1 so it chose it!
+
+## Correlated error
+
+correlated error is when there is no unidirectional relationship between two variables and the can affect one another bidirectionally.
+
+the model they describe in the practice is a lot like the one above, x1 affects both y1 and y2 unidirectinally and those two variables affect y3.  But, in this example y1 and y2 are correlated bidirectionally.
+
+in pSEM we use the %~~% argument to indicate correlated error between two different variables
+
+```{r}
+cordat <- data.frame(x1 = runif(50), y1 = runif(50), y2 = runif(50), y3 = runif(50))
+
+corsem <- psem(
+  lm(y1 ~ x1, cordat),
+  lm(y2 ~ x1, cordat),
+  y1 %~~% y2, 
+  lm(y3 ~ y1 + y2, cordat)
+)
+
+summary(corsem, .progressBar = F)
+```
+In the correlated error shown above y1 and y2 are both exogenous variables and this error is calculated by performing a correlation test (cor.test) after removing the influence of the endogenous variable x1.
+
+```{r}
+cor(resid(lm(y1 ~ x1, cordat)), resid(lm(y2 ~ x1, cordat)))
+```
+```{r}
+cerror(y1 %~~% y2, corsem)
+```
+
+## Nested models and AIC
+
+piecewise SEM can fascilitate model comparison using comparison of model AIC scores
+
+consider two models you are trying to compare:
+
+SEM1 where x1 is exogenous to y1 and y2, y1 which is exogenous to y2 and y2 which is exogenous to y3
+
+SEM2 is the same as SEM1 barring the fact that it has no y3 variable
+
+you'd think to compare them you just use the AIC function but...
+
+```{r}
+AICdat <- data.frame(x1 = runif(50), y1 = runif(50), y2 = runif(50), y3 = runif(50))
+
+sem1 <- psem(
+  lm(y1 ~ x1, AICdat),
+  lm(y2 ~ y1, AICdat),
+  lm(y3 ~ y2, AICdat)
+)
+
+sem2 <- psem(
+  lm(y1 ~ x1, AICdat),
+  lm(y2 ~ y1, AICdat)
+)
+
+AIC(sem1, sem2)
+```
+The issue with this is that the 2nd sem does not account for the missing y3 varialble which is apparently important in calculating fischers C
+
+```{r}
+sem2new <- update(sem2, y3 ~ 1)
+
+AIC(sem1, sem2new)
+```
+# Comparing package versions
+
+
+
